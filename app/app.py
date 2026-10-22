@@ -84,16 +84,16 @@ if "db_initialized" not in st.session_state:
     init_db()
     st.session_state.db_initialized = True
 
-st.set_page_config(page_title="NPCI UPI Fraud SOC", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="NPCI UPI Fraud SOC", page_icon="", layout="wide", initial_sidebar_state="expanded")
 ui_theme.inject_theme()
 
-ui_theme.gradient_header("⚡ NPCI UPI Real-Time Fraud Defense SOC", "TELEMETRY: LIVE | SWITCH LATENCY: 14.8ms (PASS <50ms SLA) | DPDP COMPLIANT")
+ui_theme.gradient_header(" NPCI UPI Real-Time Fraud Defense SOC", "TELEMETRY: LIVE | SWITCH LATENCY: 14.8ms (PASS <50ms SLA) | DPDP COMPLIANT")
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    ui_theme.glass_panel("🔐 SOC Analyst Terminal Login")
+    ui_theme.glass_panel(" SOC Analyst Terminal Login")
     pin = st.text_input("Enter Analyst Security PIN (Default: 1234)", type="password")
     if pin:
         if pin == "1234":
@@ -106,7 +106,7 @@ if not st.session_state.authenticated:
 
 # --- SIDEBAR SETTINGS & AUDIT LOG ---
 with st.sidebar:
-    ui_theme.glass_panel("⚙️ ENGINE CONTROLS")
+    ui_theme.glass_panel(" ENGINE CONTROLS")
     
     threshold_mode = st.radio(
         "Decision Threshold Strategy",
@@ -124,7 +124,7 @@ with st.sidebar:
         st.session_state.fraud_threshold = 0.40
         st.markdown("""
         <div style="background: rgba(0, 255, 204, 0.08); border-left: 3px solid #00ffcc; padding: 10px; border-radius: 4px; font-size: 11px;">
-        <b>⚡ Cost-Sensitive Engine Active:</b><br>
+        <b> Cost-Sensitive Engine Active:</b><br>
         Dynamically calculates optimal cutoff τ* minimizing:
         <br><code>E[Loss] = C_FP × P(FP) + C_FN × P(FN)</code>
         <br>Where <code>C_FP = ₹50</code> (Friction) vs <code>C_FN = ₹Amount</code> (Loss).
@@ -132,7 +132,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.header("🗄️ Regulatory Audit Log")
+    st.header(" Regulatory Audit Log")
     st.caption("Historical UPI scans archived in persistent database.")
     
     conn = sqlite3.connect(DB_PATH)
@@ -143,7 +143,7 @@ with st.sidebar:
         st.info("No batch sessions logged yet.")
     else:
         for idx, row in log_df.iterrows():
-            with st.expander(f"📄 {row['filename']}"):
+            with st.expander(f" {row['filename']}"):
                 st.write(f"**Time:** {row['timestamp'][:19]}")
                 st.write(f"**Total Scanned:** {row['total_txns']}")
                 st.write(f"**Threats Intercepted:** {row['threats']}")
@@ -268,11 +268,11 @@ def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_chan
     # Decision Banner
     if prob > effective_threshold:
         ui_theme.neon_alert(f"[ THREAT INTERCEPTED ] HIGH RISK FRAUD PROBABILITY: {prob*100:.2f}% (Threshold: {effective_threshold*100:.1f}%)", 'danger')
-        st.markdown(f"<h4 style='color: #ef4444; text-align:center;'>🚨 MATHEMATICAL ANOMALY: {reason}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: #ef4444; text-align:center;'> MATHEMATICAL ANOMALY: {reason}</h4>", unsafe_allow_html=True)
     elif prob > (effective_threshold * 0.6):
-        st.warning(f"⚠️ ELEVATED FRICTION RISK: {prob*100:.2f}% Fraud Probability (Requires Step-Up Verification)")
+        st.warning(f" ELEVATED FRICTION RISK: {prob*100:.2f}% Fraud Probability (Requires Step-Up Verification)")
     else:
-        st.success(f"✅ TRANSACTION VERIFIED & AUTHORIZED. Risk Score: {prob*100:.2f}% (Safe below τ* {effective_threshold*100:.1f}%)")
+        st.success(f" TRANSACTION VERIFIED & AUTHORIZED. Risk Score: {prob*100:.2f}% (Safe below τ* {effective_threshold*100:.1f}%)")
 
     # LLM or Deterministic Agent Report
     agent_report = ""
@@ -304,7 +304,7 @@ Provide a concise, 3-sentence operational threat brief detailing whether this ex
         ui_theme.ai_box(agent_report)
 
     # SHAP Waterfall Plot
-    st.subheader("🔍 Explainable AI: SHAP Feature Attribution Waterfall")
+    st.subheader(" Explainable AI: SHAP Feature Attribution Waterfall")
     st.caption("Shows how each UPI telemetry feature pushed the risk score above the base rate.")
     try:
         fig, ax = plt.subplots(figsize=(10, 3.8))
@@ -327,10 +327,10 @@ Provide a concise, 3-sentence operational threat brief detailing whether this ex
 # --- CORE APPLICATION TABS ---
 # =========================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📲 UPI QR INTENT SCANNER",
-    "⚡ REAL-TIME NPCI FIREHOSE",
-    "📊 BATCH SETTLEMENT AUDITOR",
-    "🕸️ MONEY MULE NETWORK GRAPH"
+    " UPI QR INTENT SCANNER",
+    " REAL-TIME NPCI FIREHOSE",
+    " BATCH SETTLEMENT AUDITOR",
+    " MONEY MULE NETWORK GRAPH"
 ])
 
 
@@ -338,7 +338,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1: UPI QR INTENT SCANNER & INTERCEPTOR
 # -------------------------------------------------------------------------
 with tab1:
-    ui_theme.glass_panel("📲 DYNAMIC UPI QR SCANNER & TRANSACTION INTERCEPTOR")
+    ui_theme.glass_panel(" DYNAMIC UPI QR SCANNER & TRANSACTION INTERCEPTOR")
     st.markdown("<p style='color: #94a3b8; font-size: 14px; margin-bottom: 20px;'>Simulate real-time merchant QR code scanning or P2P intent payment. The machine learning model intercepts the payload at the NPCI switch in sub-20ms before money leaves the bank account.</p>", unsafe_allow_html=True)
 
     col_sim_controls, col_qr_display = st.columns([1.6, 1.0])
@@ -347,11 +347,11 @@ with tab1:
         scenario = st.selectbox(
             "Select Realistic UPI Transaction Scenario",
             [
-                "🚨 Scenario 1: Nighttime Crypto Phishing QR (High Risk)",
-                "🚨 Scenario 2: SIM-Swap Mule Velocity Attack (High Risk)",
+                " Scenario 1: Nighttime Crypto Phishing QR (High Risk)",
+                " Scenario 2: SIM-Swap Mule Velocity Attack (High Risk)",
                 "🟢 Scenario 3: Swiggy / Zomato Food Delivery QR (Safe)",
                 "🟢 Scenario 4: DMart Supermarket Dynamic POS QR (Safe)",
-                "🛠️ Scenario 5: Custom Interactive UPI Parameter Tuning"
+                " Scenario 5: Custom Interactive UPI Parameter Tuning"
             ]
         )
         
@@ -446,10 +446,10 @@ with tab1:
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    scan_btn = st.button("🚀 SCAN QR & EXECUTE REAL-TIME SWITCH INTERCEPT", type="primary", use_container_width=True)
+    scan_btn = st.button(" SCAN QR & EXECUTE REAL-TIME SWITCH INTERCEPT", type="primary", use_container_width=True)
 
     if scan_btn:
-        st.markdown("### 📡 Switch Intercept Results")
+        st.markdown("###  Switch Intercept Results")
         prob, reason, agent_report, latency = execute_ai_logic(
             inp_amt, inp_hr, inp_merch, inp_dev, inp_velocity, inp_loc, inp_payer, inp_payee
         )
@@ -469,35 +469,35 @@ with tab1:
             st.markdown("---")
             col_pdf, col_2fa = st.columns([1, 1])
             with col_pdf:
-                st.markdown("#### 📄 Regulatory Incident Dossier")
+                st.markdown("####  Regulatory Incident Dossier")
                 st.caption("Generate an official audit document for banking compliance.")
                 pdf_bytes = create_pdf_report(st.session_state['qr_quarantine'], reason, prob, agent_report)
                 st.download_button(
-                    label="📥 DOWNLOAD INCIDENT REPORT (PDF)",
+                    label=" DOWNLOAD INCIDENT REPORT (PDF)",
                     data=pdf_bytes,
                     file_name=f"UPI_Incident_{st.session_state['qr_quarantine']['rrn']}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
             with col_2fa:
-                st.markdown("#### 🔓 Step-Up Biometric Authentication")
+                st.markdown("####  Step-Up Biometric Authentication")
                 st.caption("Enter Analyst Security PIN to override the automated quarantine.")
                 with st.form("qr_2fa_form"):
                     pin_in = st.text_input("Analyst Override PIN (PIN: 1234):", type="password")
                     sub_override = st.form_submit_button("AUTHORIZE OVERRIDE")
                     if sub_override:
                         if pin_in in ["1234", "123456"]:
-                            st.success("✅ BIOMETRIC OVERRIDE VERIFIED. Transaction authorized under supervisor audit.")
+                            st.success(" BIOMETRIC OVERRIDE VERIFIED. Transaction authorized under supervisor audit.")
                             st.balloons()
                         else:
-                            st.error("❌ INVALID PIN. Account frozen under DPDP protocol.")
+                            st.error(" INVALID PIN. Account frozen under DPDP protocol.")
 
 
 # -------------------------------------------------------------------------
 # TAB 2: REAL-TIME NPCI FIREHOSE
 # -------------------------------------------------------------------------
 with tab2:
-    ui_theme.glass_panel("⚡ LIVE NPCI UPI STREAM: REAL-TIME INGESTION")
+    ui_theme.glass_panel(" LIVE NPCI UPI STREAM: REAL-TIME INGESTION")
     st.markdown("<p style='color: #94a3b8; padding-bottom: 15px;'>High-throughput streaming simulation. Intercepts incoming UPI packets from payment service providers (PhonePe, GPay, Paytm) and evaluates risk in sub-20ms.</p>", unsafe_allow_html=True)
     
     start_stream = st.button("▶ START CONTINUOUS STREAMING FIREHOSE", use_container_width=True)
@@ -539,7 +539,7 @@ with tab2:
             
             tau_star = calculate_optimal_threshold(r_amt)
             threshold = tau_star if threshold_mode.startswith("Cost-Sensitive") else st.session_state.fraud_threshold
-            status = "🔴 BLOCKED" if prob > threshold else "🟡 SUSPICIOUS" if prob > (threshold * 0.6) else "🟢 PASS"
+            status = " BLOCKED" if prob > threshold else "🟡 SUSPICIOUS" if prob > (threshold * 0.6) else "🟢 PASS"
             
             user_name = fake.user_name()
             bank_handle = random.choice(["okhdfcbank", "okaxis", "oksbi", "paytm", "ybl"])
@@ -575,7 +575,7 @@ with tab2:
     if st.session_state.history:
         csv_data = pd.DataFrame(st.session_state.history).to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Download Stream Session Audit Log (CSV)",
+            label=" Download Stream Session Audit Log (CSV)",
             data=csv_data,
             file_name="upi_stream_audit_log.csv",
             mime="text/csv"
@@ -589,9 +589,9 @@ with tab2:
         )
         
         st.markdown("---")
-        st.markdown("<h3 style='color: #ef4444;'>🔒 QUARANTINE PROTOCOL: STEP-UP 2FA REQUIRED</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #ef4444;'> QUARANTINE PROTOCOL: STEP-UP 2FA REQUIRED</h3>", unsafe_allow_html=True)
         pdf_bytes = create_pdf_report(q_txn, reason, prob, agent_report)
-        st.download_button(label="📥 Generate Incident PDF", data=pdf_bytes, file_name="Incident_Report.pdf", mime="application/pdf")
+        st.download_button(label=" Generate Incident PDF", data=pdf_bytes, file_name="Incident_Report.pdf", mime="application/pdf")
         
         with st.form("stream_2fa_form"):
             col1, col2 = st.columns([1, 2])
@@ -599,23 +599,23 @@ with tab2:
                 pin = st.text_input("Enter Biometric PIN (Default: 1234):", type="password", max_chars=6)
             with col2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                submitted = st.form_submit_button("VERIFY & OVERRIDE 🔓")
+                submitted = st.form_submit_button("VERIFY & OVERRIDE ")
                 
             if submitted:
                 if pin in ["1234", "123456"]:
-                    st.success("✅ PIN VERIFIED. OVERRIDE GRANTED. Transaction released from quarantine.")
+                    st.success(" PIN VERIFIED. OVERRIDE GRANTED. Transaction released from quarantine.")
                     st.balloons()
                     del st.session_state['quarantine_txn']
                     st.rerun()
                 else:
-                    st.error("❌ INVALID PIN. Account locked under NPCI safety directives.")
+                    st.error(" INVALID PIN. Account locked under NPCI safety directives.")
 
 
 # -------------------------------------------------------------------------
 # TAB 3: BATCH SETTLEMENT AUDITOR
 # -------------------------------------------------------------------------
 with tab3:
-    ui_theme.glass_panel("📊 BATCH SETTLEMENT AUDITOR")
+    ui_theme.glass_panel(" BATCH SETTLEMENT AUDITOR")
     st.markdown("<p style='color: #94a3b8; padding-bottom: 20px;'>Audit bulk daily settlement files from UPI acquiring banks or merchant payment aggregators.</p>", unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader("Upload Settlement Records (CSV)", type=["csv"])
@@ -683,7 +683,7 @@ with tab3:
             for amt, p in zip(df['Amount'], probs):
                 t_star = calculate_optimal_threshold(amt) if threshold_mode.startswith("Cost-Sensitive") else st.session_state.fraud_threshold
                 if p > t_star:
-                    statuses.append("🔴 THREAT (BLOCKED)")
+                    statuses.append(" THREAT (BLOCKED)")
                 elif p > (t_star * 0.6):
                     statuses.append("🟡 SUSPICIOUS")
                 else:
@@ -698,9 +698,9 @@ with tab3:
             suspicious = len([s for s in df['Audit_Status'] if 'SUSPICIOUS' in s])
             
             c1, c2, c3 = st.columns(3)
-            with c1: ui_theme.glass_metric(f"{len(df)}", "Audited Transactions", "📁")
-            with c2: ui_theme.glass_metric(f"{threats}", "Threats Intercepted", "🚨")
-            with c3: ui_theme.glass_metric(f"{suspicious}", "Suspicious Escalate", "⚠️")
+            with c1: ui_theme.glass_metric(f"{len(df)}", "Audited Transactions", "")
+            with c2: ui_theme.glass_metric(f"{threats}", "Threats Intercepted", "")
+            with c3: ui_theme.glass_metric(f"{suspicious}", "Suspicious Escalate", "")
             
             st.dataframe(df.head(50), use_container_width=True)
             
@@ -750,21 +750,21 @@ with tab3:
             csv_rows.append(f"{dt.strftime('%d/%m/%Y %H:%M')},UPI/{ref}/{m_name},{ref},{amt:.2f},{cat},Android,12,Yes")
             
         sample_csv = "\n".join(csv_rows)
-        st.download_button("📥 Download Realistic UPI Batch CSV (55 Rows)", sample_csv, "upi_batch_sample.csv", "text/csv")
+        st.download_button(" Download Realistic UPI Batch CSV (55 Rows)", sample_csv, "upi_batch_sample.csv", "text/csv")
 
 
 # -------------------------------------------------------------------------
 # TAB 4: MONEY MULE NETWORK GRAPH
 # -------------------------------------------------------------------------
 with tab4:
-    ui_theme.glass_panel("🕸️ MONEY MULE NETWORK GRAPH: MULTI-HOP LAYERING")
+    ui_theme.glass_panel(" MONEY MULE NETWORK GRAPH: MULTI-HOP LAYERING")
     st.markdown("<p style='color: #94a3b8; padding-bottom: 20px;'>Visualizes complex syndicate networks (smurfing/money muling) routing ill-gotten funds across multiple VPA hops to offshore or crypto off-ramps.</p>", unsafe_allow_html=True)
     
     G = nx.DiGraph()
     
     if 'fraud_df' in st.session_state:
         df_net = st.session_state['fraud_df']
-        st.success("🔗 Live Graph: Rendering network map from your audited settlement batch.")
+        st.success(" Live Graph: Rendering network map from your audited settlement batch.")
         
         G.add_node("Primary Compromised VPA", color="#3b82f6", size=30)
         
@@ -779,7 +779,7 @@ with tab4:
             G.add_node(node_name, color=node_color, size=size)
             G.add_edge("Primary Compromised VPA", node_name)
     else:
-        st.info("ℹ️ Displaying realistic money mule syndicate topology.")
+        st.info("ℹ Displaying realistic money mule syndicate topology.")
         G.add_node("Compromised Payer\n(rahul@oksbi)", color="#3b82f6", size=25)
         
         # Mules

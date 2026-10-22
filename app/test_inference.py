@@ -42,6 +42,6 @@ try:
     shap_values = explainer.shap_values(features)
     print("SHAP successful.")
     
-    print("✅ Project 1 backend is 100% functionally sound.")
+    print(" Project 1 backend is 100% functionally sound.")
 except Exception as e:
-    print(f"❌ ERROR in Project 1: {e}")
+    print(f" ERROR in Project 1: {e}")
