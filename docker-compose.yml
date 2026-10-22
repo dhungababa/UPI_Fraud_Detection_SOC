@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: upi_fraud
+    ports:
+      # We map to 5433 on your Windows machine to avoid conflicting with your native PostgreSQL on 5432!
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  fraud_dashboard:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - DATABASE_URL=postgresql://admin:password@postgres_db:5432/upi_fraud
+    depends_on:
+      - postgres_db
+
+volumes:
+  pg_data:
