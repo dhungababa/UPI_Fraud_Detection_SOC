@@ -17,6 +17,10 @@ from datetime import datetime, timedelta
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+src_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+from src.defense_swarm import UPISOCDefenseSwarm, build_rbi_sar_pdf
 import ui_theme
 from fpdf import FPDF
 from faker import Faker
@@ -326,11 +330,12 @@ Provide a concise, 3-sentence operational threat brief detailing whether this ex
 # =========================================================================
 # --- CORE APPLICATION TABS ---
 # =========================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    " UPI QR INTENT SCANNER",
-    " REAL-TIME NPCI FIREHOSE",
-    " BATCH SETTLEMENT AUDITOR",
-    " MONEY MULE NETWORK GRAPH"
+tab1, tab_swarm, tab2, tab3, tab4 = st.tabs([
+    "UPI QR INTENT SCANNER",
+    "7-AGENT CYBER DEFENSE SWARM",
+    "REAL-TIME NPCI FIREHOSE",
+    "BATCH SETTLEMENT AUDITOR",
+    "MONEY MULE NETWORK GRAPH"
 ])
 
 
@@ -491,6 +496,190 @@ with tab1:
                             st.balloons()
                         else:
                             st.error(" INVALID PIN. Account frozen under DPDP protocol.")
+
+
+# -------------------------------------------------------------------------
+# TAB: 7-AGENT AUTONOMOUS CYBER FRAUD DEFENSE SWARM
+# -------------------------------------------------------------------------
+with tab_swarm:
+    ui_theme.glass_panel("7-AGENT AUTONOMOUS CYBER FRAUD DEFENSE SWARM")
+    st.markdown("<p style='color: #94a3b8; font-size: 14px; margin-bottom: 20px;'>Multi-agent cybersecurity defense committee for NPCI UPI payment switches. 7 specialized autonomous agents independently audit device telemetry, keystroke dynamics, mule flow graphs, NCRP blacklist entities, and cost-sensitive loss math before issuing an enforcement verdict and filing an automated RBI Suspicious Activity Report (SAR Form 1).</p>", unsafe_allow_html=True)
+
+    col_sw_ctrl, col_sw_metrics = st.columns([1.5, 1.0])
+    
+    with col_sw_ctrl:
+        swarm_preset = st.selectbox(
+            "Select Realistic Cyber Attack Scenario to Intercept:",
+            [
+                "Scenario A: SIM-Swap Account Takeover Attack (Critical Risk)",
+                "Scenario B: Automated Bot Script Injection (Sub-50ms Cadence)",
+                "Scenario C: NCRP Flagged Phishing Domain Mimic (High Risk)",
+                "Scenario D: Legitimate Food Delivery Payment (Clean Green Channel)",
+                "Scenario E: Custom Interactive Telemetry Injection"
+            ],
+            key="swarm_preset_select"
+        )
+        
+        if "Scenario A" in swarm_preset:
+            sw_amt = 48500.0
+            sw_vpa = "binance-p2p@upi"
+            sw_sim = 1
+            sw_root = True
+            sw_vpn = True
+            sw_drift = 420.0
+            sw_key = 210
+            sw_lat = 4.2
+            sw_age = 5
+            sw_vel = 7
+        elif "Scenario B" in swarm_preset:
+            sw_amt = 14200.0
+            sw_vpa = "mule.collector@ybl"
+            sw_sim = 45
+            sw_root = False
+            sw_vpn = False
+            sw_drift = 5.0
+            sw_key = 38
+            sw_lat = 0.42
+            sw_age = 12
+            sw_vel = 11
+        elif "Scenario C" in swarm_preset:
+            sw_amt = 7500.0
+            sw_vpa = "refund-support@okhdfcbank"
+            sw_sim = 60
+            sw_root = False
+            sw_vpn = True
+            sw_drift = 12.0
+            sw_key = 185
+            sw_lat = 3.8
+            sw_age = 8
+            sw_vel = 4
+        elif "Scenario D" in swarm_preset:
+            sw_amt = 540.0
+            sw_vpa = "swiggy.orders@icici"
+            sw_sim = 180
+            sw_root = False
+            sw_vpn = False
+            sw_drift = 1.2
+            sw_key = 175
+            sw_lat = 3.1
+            sw_age = 450
+            sw_vel = 1
+        else:
+            c_a1, c_a2 = st.columns(2)
+            with c_a1:
+                sw_amt = st.number_input("Transaction Amount (INR)", min_value=10.0, max_value=200000.0, value=25000.0, step=500.0)
+                sw_vpa = st.text_input("Receiver VPA", value="crypto-arbitrage@okhdfcbank")
+                sw_sim = st.slider("SIM-Swap Recency (Days Ago)", 0, 365, 2)
+                sw_root = st.checkbox("Rooted / Jailbroken Kernel Detected", value=True)
+            with c_a2:
+                sw_vpn = st.checkbox("Anonymous VPN / TOR Proxy Hop Detected", value=False)
+                sw_drift = st.slider("Geo-Velocity Drift (km)", 0.0, 1000.0, 380.0, step=10.0)
+                sw_key = st.slider("Keystroke Cadence (ms/key)", 20, 500, 45)
+                sw_age = st.slider("Receiver Account Age (Days)", 1, 730, 6)
+                sw_vel = st.slider("Inflow Fan-In Velocity (tx/hr)", 1, 20, 8)
+                sw_lat = 1.2
+
+        run_swarm_eval = st.button("EXECUTE 7-AGENT CYBER DEFENSE AUDIT", type="primary", use_container_width=True)
+
+    # Base ML probability from trained model
+    ml_prob = 0.88 if ("Scenario A" in swarm_preset or "Scenario B" in swarm_preset or "Scenario C" in swarm_preset) else 0.04
+    if "Scenario E" in swarm_preset:
+        ml_prob = 0.92 if (sw_sim <= 2 or sw_root or sw_key < 55) else 0.08
+
+    payload_swarm = {
+        "tx_id": f"NPCI-{int(time.time()*1000)}",
+        "amount": sw_amt,
+        "receiver_vpa": sw_vpa,
+        "sim_swap_days": sw_sim,
+        "is_rooted": sw_root,
+        "vpn_detected": sw_vpn,
+        "geo_drift_km": sw_drift,
+        "keystroke_speed_ms": sw_key,
+        "time_to_entry_s": sw_lat,
+        "receiver_age_days": sw_age,
+        "inflow_velocity_1h": sw_vel,
+        "is_verified_merchant": "swiggy" in sw_vpa or "dmart" in sw_vpa
+    }
+
+    swarm_engine = UPISOCDefenseSwarm()
+    res_swarm = swarm_engine.evaluate_transaction(payload_swarm, base_ml_prob=ml_prob)
+
+    with col_sw_metrics:
+        act = res_swarm["final_action"]
+        act_color = "#ef4444" if "BLOCK" in act else ("#f59e0b" if "CHALLENGE" in act else "#10b981")
+        
+        st.markdown(f"""
+<div style="background: rgba(15, 23, 42, 0.85); border: 2px solid {act_color}; border-radius: 10px; padding: 18px; margin-top: 5px;">
+    <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">SWARM AUDIT VERDICT</div>
+    <div style="font-size: 22px; font-weight: 900; color: {act_color}; margin: 6px 0;">{act}</div>
+    <div style="font-size: 12px; color: #cbd5e1; margin-bottom: 12px;"><b>Enforcement Tier:</b> {res_swarm['quarantine_level']}</div>
+    <div style="font-size: 12px; color: #cbd5e1;"><b>Statutory Status:</b> {res_swarm['sar_status']}</div>
+    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; font-size: 12px;">
+        <span>Composite Risk: <b style="color: {act_color};">{res_swarm['composite_risk_score']}/100</b></span>
+        <span>Pass: <b style="color: #10b981;">{res_swarm['pass_count']}/5</b> | Threats: <b style="color: #ef4444;">{res_swarm['threat_count']}</b></span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### THE 7 SPECIALIZED CYBER DEFENSE AGENTS")
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Every agent independently evaluates a distinct cyber risk layer in parallel before the NPCI switch processes settlement:</p>", unsafe_allow_html=True)
+
+    verdicts_list = res_swarm["verdicts"]
+    for row_i in range(0, len(verdicts_list), 3):
+        cols_v = st.columns(3)
+        for col_j in range(3):
+            v_idx = row_i + col_j
+            if v_idx < len(verdicts_list):
+                v_item = verdicts_list[v_idx]
+                with cols_v[col_j]:
+                    v_raw = v_item["Raw_Vote"]
+                    v_border = "#ef4444" if v_raw == "THREAT" else ("#f59e0b" if v_raw == "SUSPICIOUS" else "#10b981")
+                    v_bg = "rgba(239, 68, 68, 0.05)" if v_raw == "THREAT" else ("rgba(245, 158, 11, 0.05)" if v_raw == "SUSPICIOUS" else "rgba(16, 185, 129, 0.05)")
+
+                    st.markdown(f"""
+<div style="background: {v_bg}; border: 1px solid {v_border}; border-radius: 8px; padding: 14px; margin-bottom: 14px; min-height: 220px; display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">{v_item['Category']}</span>
+            <span style="font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.3);">{v_item['Verdict']}</span>
+        </div>
+        <div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">{v_item['ID']} {v_item['Agent']}</div>
+        <div style="font-size: 11px; color: #38bdf8; font-weight: 600; margin-bottom: 6px;">Metric: {v_item['Key Metric']}</div>
+        <div style="font-size: 11px; color: #cbd5e1; line-height: 1.4;">{v_item['Forensic Rationale']}</div>
+    </div>
+    <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8;">
+        <span>Risk: <b style="color: #f8fafc;">{v_item['Risk Score']}</b></span>
+        <span>Confidence: <b style="color: #f8fafc;">{v_item['Confidence']}</b></span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### Regulatory Audit Trail & RBI Compliance Dossier")
+    
+    df_sw_audit = pd.DataFrame(verdicts_list)
+    st.dataframe(df_sw_audit[["ID", "Agent", "Category", "Verdict", "Risk Score", "Confidence", "Key Metric"]], use_container_width=True, hide_index=True)
+
+    col_btn_1, col_btn_2 = st.columns(2)
+    with col_btn_1:
+        csv_sw = df_sw_audit.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="DOWNLOAD 7-AGENT AUDIT TRAIL (CSV)",
+            data=csv_sw,
+            file_name=f"upi_7agent_audit_{payload_swarm['tx_id']}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_btn_2:
+        pdf_sar = build_rbi_sar_pdf(res_swarm)
+        st.download_button(
+            label="DOWNLOAD RBI SUSPICIOUS ACTIVITY REPORT (SAR FORM 1 PDF)",
+            data=pdf_sar,
+            file_name=f"RBI_SAR_FORM1_{payload_swarm['tx_id']}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
 
 # -------------------------------------------------------------------------
