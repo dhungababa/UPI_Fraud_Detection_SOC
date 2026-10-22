@@ -349,8 +349,8 @@ with tab1:
             [
                 " Scenario 1: Nighttime Crypto Phishing QR (High Risk)",
                 " Scenario 2: SIM-Swap Mule Velocity Attack (High Risk)",
-                "🟢 Scenario 3: Swiggy / Zomato Food Delivery QR (Safe)",
-                "🟢 Scenario 4: DMart Supermarket Dynamic POS QR (Safe)",
+                " Scenario 3: Swiggy / Zomato Food Delivery QR (Safe)",
+                " Scenario 4: DMart Supermarket Dynamic POS QR (Safe)",
                 " Scenario 5: Custom Interactive UPI Parameter Tuning"
             ]
         )
@@ -539,7 +539,7 @@ with tab2:
             
             tau_star = calculate_optimal_threshold(r_amt)
             threshold = tau_star if threshold_mode.startswith("Cost-Sensitive") else st.session_state.fraud_threshold
-            status = " BLOCKED" if prob > threshold else "🟡 SUSPICIOUS" if prob > (threshold * 0.6) else "🟢 PASS"
+            status = " BLOCKED" if prob > threshold else " SUSPICIOUS" if prob > (threshold * 0.6) else " PASS"
             
             user_name = fake.user_name()
             bank_handle = random.choice(["okhdfcbank", "okaxis", "oksbi", "paytm", "ybl"])
@@ -685,9 +685,9 @@ with tab3:
                 if p > t_star:
                     statuses.append(" THREAT (BLOCKED)")
                 elif p > (t_star * 0.6):
-                    statuses.append("🟡 SUSPICIOUS")
+                    statuses.append(" SUSPICIOUS")
                 else:
-                    statuses.append("🟢 SAFE")
+                    statuses.append(" SAFE")
             df['Audit_Status'] = statuses
             df['Raw_Prob'] = probs
             df = df.sort_values('Raw_Prob', ascending=False).drop(columns=['Raw_Prob'])
