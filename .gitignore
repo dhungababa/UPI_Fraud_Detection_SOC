@@ -13,3 +13,7 @@ env/
 reports/
 hf_cache/
 llama_cache/
+
+data/raw/*.csv
+data/processed/*.csv
+*.db

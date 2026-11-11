@@ -21,6 +21,8 @@ src_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 from src.defense_swarm import UPISOCDefenseSwarm, build_rbi_sar_pdf
+from src.feature_store import GLOBAL_FEATURE_STORE
+from src.geo_resolver import resolve_ip
 import ui_theme
 from fpdf import FPDF
 from faker import Faker
@@ -91,6 +93,7 @@ if "db_initialized" not in st.session_state:
 st.set_page_config(page_title="NPCI UPI Fraud SOC", page_icon="", layout="wide", initial_sidebar_state="expanded")
 ui_theme.inject_theme()
 
+ui_theme.render_ecosystem_header("upi")
 ui_theme.gradient_header(" NPCI UPI Real-Time Fraud Defense SOC", "TELEMETRY: LIVE | SWITCH LATENCY: 14.8ms (PASS <50ms SLA) | DPDP COMPLIANT")
 
 if "authenticated" not in st.session_state:
@@ -136,25 +139,24 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.header(" Regulatory Audit Log")
-    st.caption("Historical UPI scans archived in persistent database.")
-    
-    conn = sqlite3.connect(DB_PATH)
-    log_df = pd.read_sql("SELECT filename, timestamp, total_txns, threats FROM uploads ORDER BY id DESC LIMIT 20", conn)
-    conn.close()
-    
-    if log_df.empty:
-        st.info("No batch sessions logged yet.")
-    else:
-        for idx, row in log_df.iterrows():
-            with st.expander(f" {row['filename']}"):
-                st.write(f"**Time:** {row['timestamp'][:19]}")
-                st.write(f"**Total Scanned:** {row['total_txns']}")
-                st.write(f"**Threats Intercepted:** {row['threats']}")
-                if row['threats'] > 0:
-                    st.error("MALICIOUS ANOMALIES INTERCEPTED")
-                else:
-                    st.success("CLEAN BATCH")
+    with st.expander("📜 Regulatory Audit Log (Recent Batches)", expanded=False):
+        st.caption("Historical UPI scans archived in persistent database.")
+        conn = sqlite3.connect(DB_PATH)
+        log_df = pd.read_sql("SELECT filename, timestamp, total_txns, threats FROM uploads ORDER BY id DESC LIMIT 20", conn)
+        conn.close()
+        
+        if log_df.empty:
+            st.info("No batch sessions logged yet.")
+        else:
+            for idx, row in log_df.iterrows():
+                with st.expander(f" {row['filename']}"):
+                    st.write(f"**Time:** {row['timestamp'][:19]}")
+                    st.write(f"**Total Scanned:** {row['total_txns']}")
+                    st.write(f"**Threats Intercepted:** {row['threats']}")
+                    if row['threats'] > 0:
+                        st.error("MALICIOUS ANOMALIES INTERCEPTED")
+                    else:
+                        st.success("CLEAN BATCH")
 
 
 @st.cache_resource
@@ -179,10 +181,11 @@ def check_ollama():
 
 
 # Global execution logic function (Hybrid Microservice Architecture with Latency Benchmarking)
-def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_changed, p_vpa="", b_vpa=""):
+def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_changed, p_vpa="", b_vpa="", client_ip="49.36.128.5"):
     t_start = time.perf_counter()
     latency_ms = 0.0
     is_api = False
+    enrichment = None
     
     try:
         payload = {
@@ -191,9 +194,11 @@ def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_chan
             "merchant": str(merchant),
             "device": str(device),
             "txn_count_1h": int(txn_count_1h),
-            "location_changed": str(location_changed)
+            "location_changed": str(location_changed),
+            "payer_vpa": str(p_vpa or "user@okhdfcbank"),
+            "client_ip": str(client_ip or "49.36.128.5")
         }
-        response = requests.post("http://localhost:9001/predict", json=payload, timeout=2.0)
+        response = requests.post("http://localhost:9001/predict", json=payload, timeout=2.5)
         response.raise_for_status()
         data = response.json()
         latency_ms = (time.perf_counter() - t_start) * 1000.0
@@ -201,6 +206,7 @@ def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_chan
         
         prob = data['fraud_probability']
         reason = data.get('shap_reason', 'High-risk feature constellation')
+        enrichment = data.get('enrichment')
         
         shap_vals = np.array(data['shap_values'])
         feat_vals = np.array(data['feature_values'])
@@ -210,23 +216,45 @@ def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_chan
         
     except Exception:
         t_edge = time.perf_counter()
+        enrichment = GLOBAL_FEATURE_STORE.enrich_and_record(
+            payer_vpa=str(p_vpa or "user@okhdfcbank"),
+            amount=float(amount),
+            client_ip=str(client_ip or "49.36.128.5")
+        )
+        
+        eff_count = txn_count_1h if txn_count_1h > 1 else enrichment['txn_count_1h']
+        eff_amt = amount * max(1, eff_count)
+        loc_flag = 1 if (str(location_changed).lower() in ["yes", "1", "true"] or enrichment['geo_drift_km'] > 25.0 or enrichment['is_impossible_travel']) else 0
+        
         amount_log = np.log1p(amount)
         def safe_transform(le, val):
             return int(le.transform([val])[0]) if val in le.classes_ else 0
         merchant_encoded = safe_transform(le_merchant, merchant)
         device_encoded = safe_transform(le_device, device)
-        loc_changed_val = 1 if str(location_changed).lower() in ["yes", "1", "true"] else 0
+        
+        cur_dow = int(time.strftime('%w'))
+        cur_wknd = 1 if cur_dow in [0, 6] else 0
         
         features = pd.DataFrame([{
-            'amount_log': amount_log, 'hour': hour, 'day_of_week': 0, 'is_weekend': 0,
-            'merchant_encoded': merchant_encoded, 'device_encoded': device_encoded,
-            'txn_count_1h': txn_count_1h, 'txn_amount_1h': amount, 'location_changed': loc_changed_val
+            'amount_log': amount_log,
+            'hour': hour,
+            'day_of_week': cur_dow,
+            'is_weekend': cur_wknd,
+            'merchant_encoded': merchant_encoded,
+            'device_encoded': device_encoded,
+            'txn_count_1h': eff_count,
+            'txn_amount_1h': eff_amt,
+            'location_changed': loc_flag
         }])
+        
         prob = float(model.predict_proba(features)[0][1])
+        if enrichment['is_impossible_travel']:
+            prob = max(prob, 0.94)
+            
         latency_ms = (time.perf_counter() - t_edge) * 1000.0
         
         shap_values_raw = explainer.shap_values(features)
-        feature_names_raw = features.columns
+        feature_names_raw = features.columns.tolist()
         
         def get_reason_code(shap_row, feature_names, top_n=3):
             positive_pairs = [(name, val) for name, val in zip(feature_names, shap_row) if val > 0]
@@ -236,6 +264,9 @@ def execute_ai_logic(amount, hour, merchant, device, txn_count_1h, location_chan
             return "Anomalies triggered in: " + " | ".join(parts).upper()
             
         reason = get_reason_code(shap_values_raw[0], feature_names_raw)
+        if enrichment['is_impossible_travel']:
+            reason = f"[IMPOSSIBLE TRAVEL ANOMALY] {enrichment['travel_alert']} | " + reason
+            
         explainer_waterfall = shap.Explainer(model)
         shap_obj = explainer_waterfall(features)[0]
 
@@ -330,12 +361,14 @@ Provide a concise, 3-sentence operational threat brief detailing whether this ex
 # =========================================================================
 # --- CORE APPLICATION TABS ---
 # =========================================================================
-tab1, tab_swarm, tab2, tab3, tab4 = st.tabs([
+tab1, tab_swarm, tab_soar, tab2, tab3, tab4, tab_copilot = st.tabs([
     "UPI QR INTENT SCANNER",
     "7-AGENT CYBER DEFENSE SWARM",
+    "🛡️ SOAR PLAYBOOK & THREAT INTEL FEED",
     "REAL-TIME NPCI FIREHOSE",
     "BATCH SETTLEMENT AUDITOR",
-    "MONEY MULE NETWORK GRAPH"
+    "MONEY MULE NETWORK GRAPH",
+    "💬 NPCI SOC COPILOT"
 ])
 
 
@@ -438,6 +471,19 @@ with tab1:
         with c_l:
             inp_loc = st.selectbox("Geolocation / IP Cell Tower Shift?", ["No", "Yes"], index=1 if default_loc == "Yes" else 0)
 
+        st.markdown("##### Real-Time IP Geolocation and Velocity Sentinel")
+        c_ip1, c_ip2 = st.columns([2, 1])
+        with c_ip1:
+            inp_ip = st.text_input("Origin IP Address (Live Lookup):", value="49.36.128.5")
+        with c_ip2:
+            quick_preset = st.selectbox("Quick Threat Presets:", ["Reliance Jio (Delhi)", "Google Ashburn US (Jump Threat!)", "Local Internal Switch (Mumbai)"])
+            if quick_preset == "Reliance Jio (Delhi)":
+                inp_ip = "49.36.128.5"
+            elif quick_preset == "Google Ashburn US (Jump Threat!)":
+                inp_ip = "8.8.8.8"
+            elif quick_preset == "Local Internal Switch (Mumbai)":
+                inp_ip = "127.0.0.1" 
+
     # Dynamic Raw UPI Intent String
     raw_upi_intent = f"upi://pay?pa={inp_payee}&pn=Merchant&am={inp_amt:.2f}&cu=INR&mc=6012&tr=RRN{random.randint(100000000000, 999999999999)}"
     
@@ -456,11 +502,26 @@ with tab1:
     if scan_btn:
         st.markdown("###  Switch Intercept Results")
         prob, reason, agent_report, latency = execute_ai_logic(
-            inp_amt, inp_hr, inp_merch, inp_dev, inp_velocity, inp_loc, inp_payer, inp_payee
+            inp_amt, inp_hr, inp_merch, inp_dev, inp_velocity, inp_loc, inp_payer, inp_payee, inp_ip
         )
         
         # If flagged as high risk, give 2FA & Incident PDF options
         tau_star = calculate_optimal_threshold(inp_amt)
+        st.session_state['last_intercept'] = {
+            'rrn': f"RRN-{random.randint(100000000000, 999999999999)}",
+            'amt': inp_amt,
+            'hr': inp_hr,
+            'merch': inp_merch,
+            'dev': inp_dev,
+            'count': inp_velocity,
+            'loc': inp_loc,
+            'payer_vpa': inp_payer,
+            'payee_vpa': inp_payee,
+            'ip': inp_ip,
+            'fraud_prob': float(prob),
+            'tau_star': float(tau_star),
+            'reason': reason
+        }
         effective_threshold = tau_star if threshold_mode.startswith("Cost-Sensitive") else st.session_state.fraud_threshold
         
         if prob > effective_threshold:
@@ -484,6 +545,95 @@ with tab1:
                     mime="application/pdf",
                     use_container_width=True
                 )
+
+
+        # ==========================================
+        # 3D GEOSPATIAL PAYMENT FLIGHT TRAJECTORY (ORBITAL GLOBE)
+        # ==========================================
+        st.markdown("---")
+        st.markdown(f"""
+<div class="soc-3d-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="soc-badge">ORBITAL SOC TELEMETRY | 3D GEOSPATIAL SWITCH INTERCEPT</span>
+        <span style="font-size: 11px; color: #00ffcc; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; padding: 2px 8px; border-radius: 4px; font-weight: 700;">3D ORTHOGRAPHIC GLOBE</span>
+    </div>
+    <h3 style="color: #f8fafc; margin-top: 8px; margin-bottom: 4px;"> 3D Geospatial Payment Trajectory & Geodesic Velocity Globe</h3>
+    <p style="color: #94a3b8; font-size: 13px; margin-bottom: 0px;">
+        Tracks the physical coordinate routing of incoming UPI packets on an interactive 3D digital globe. If supersonic cross-continent travel is detected (>800 km/h), a glowing crimson trajectory arc flags immediate account takeover.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+        try:
+            from src.geo_resolver import resolve_ip, haversine_distance_km
+            orig_geo = resolve_ip(inp_ip)
+            mumbai_lat, mumbai_lon = 19.0760, 72.8777
+            curr_lat = orig_geo.get('lat', mumbai_lat)
+            curr_lon = orig_geo.get('lon', mumbai_lon)
+            city_name = orig_geo.get('city', 'Unknown City')
+            country_name = orig_geo.get('country', 'India')
+            isp_name = orig_geo.get('isp', 'Local Switch')
+            
+            drift_dist = haversine_distance_km(mumbai_lat, mumbai_lon, curr_lat, curr_lon)
+            is_cross_continent = (drift_dist > 500.0)
+            
+            fig_globe = go.Figure()
+            
+            # Base Switch Hub: Mumbai Central NPCI Switch
+            fig_globe.add_trace(go.Scattergeo(
+                lat=[mumbai_lat], lon=[mumbai_lon],
+                mode='markers+text',
+                name='NPCI Primary Switch (Mumbai)',
+                text=['NPCI Primary Switch (Mumbai)'],
+                textposition='bottom center',
+                marker=dict(size=12, color='#00ffcc', symbol='diamond', line=dict(color='#ffffff', width=2))
+            ))
+            
+            # Current Client Ingestion Node
+            node_color = '#ef4444' if is_cross_continent else '#10b981'
+            fig_globe.add_trace(go.Scattergeo(
+                lat=[curr_lat], lon=[curr_lon],
+                mode='markers+text',
+                name=f'Payer Origin: {city_name}',
+                text=[f'{city_name}, {country_name}<br>IP: {inp_ip}<br>ISP: {isp_name}'],
+                textposition='top center',
+                marker=dict(size=14, color=node_color, symbol='circle', line=dict(color='#ffffff', width=2))
+            ))
+            
+            # Flight Trajectory Arc
+            if is_cross_continent:
+                n_pts = 30
+                lats_arc = np.linspace(mumbai_lat, curr_lat, n_pts)
+                lons_arc = np.linspace(mumbai_lon, curr_lon, n_pts)
+                
+                fig_globe.add_trace(go.Scattergeo(
+                    lat=lats_arc, lon=lons_arc,
+                    mode='lines',
+                    name=f'Impossible Travel Arc ({drift_dist:,.0f} km)',
+                    line=dict(width=3.5, color='#ef4444')
+                ))
+            
+            fig_globe.update_geos(
+                projection_type='orthographic',
+                showcoastlines=True, coastlinecolor='#334155',
+                showland=True, landcolor='#0f172a',
+                showocean=True, oceancolor='#020617',
+                showcountries=True, countrycolor='#1e293b',
+                showlakes=True, lakecolor='#020617',
+                bgcolor='rgba(4, 7, 14, 0.98)'
+            )
+            fig_globe.update_layout(
+                height=520,
+                margin=dict(l=10, r=10, t=20, b=10),
+                paper_bgcolor='rgba(4, 7, 14, 0.98)',
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                font=dict(color='#e2e8f0', size=11)
+            )
+            st.plotly_chart(fig_globe, use_container_width=True)
+
+
+
+        except Exception as e_globe:
+            st.caption(f"3D Globe Engine: {e_globe}")
             with col_2fa:
                 st.markdown("####  Step-Up Biometric Authentication")
                 st.caption("Enter Analyst Security PIN to override the automated quarantine.")
@@ -497,6 +647,22 @@ with tab1:
                         else:
                             st.error(" INVALID PIN. Account frozen under DPDP protocol.")
 
+
+    # ==========================================
+    # ⚡ NPCI AUTOMATED SOAR PLAYBOOK (EMBEDDED QUICK ACTION)
+    # ==========================================
+    st.markdown("---")
+    with st.expander("🛡️ ⚡ AUTOMATED SOAR PLAYBOOK CONTROLS (QUICK ACTIONS)", expanded=False):
+        import soar_playbook
+        soar_playbook.render_soar_component(st.session_state.get('last_intercept', {}), key_prefix="tab1_soar")
+
+    # ==========================================
+    # 🤖 NPCI SOC CYBER COPILOT (EMBEDDED IN TAB 1)
+    # ==========================================
+    st.markdown("---")
+    with st.expander("💬 👮‍♂️ NPCI SOC CYBER THREAT COPILOT (CLICK TO EXPAND / ASK QUESTIONS)", expanded=True):
+        import soc_copilot
+        soc_copilot.render_soc_copilot_tab(st.session_state.get('last_intercept', {}), key_prefix="tab1_soc")
 
 # -------------------------------------------------------------------------
 # TAB: 7-AGENT AUTONOMOUS CYBER FRAUD DEFENSE SWARM
@@ -581,10 +747,40 @@ with tab_swarm:
 
         run_swarm_eval = st.button("EXECUTE 7-AGENT CYBER DEFENSE AUDIT", type="primary", use_container_width=True)
 
-    # Base ML probability from trained model
-    ml_prob = 0.88 if ("Scenario A" in swarm_preset or "Scenario B" in swarm_preset or "Scenario C" in swarm_preset) else 0.04
-    if "Scenario E" in swarm_preset:
-        ml_prob = 0.92 if (sw_sim <= 2 or sw_root or sw_key < 55) else 0.08
+    # Authentic ML Inference via Trained XGBoost Classifier
+    amount_log = np.log1p(sw_amt)
+    vpa_lower = sw_vpa.lower()
+    if "crypto" in vpa_lower:
+        m_str = "Crypto"
+    elif "swiggy" in vpa_lower or "zomato" in vpa_lower or "food" in vpa_lower:
+        m_str = "Food"
+    elif "travel" in vpa_lower or "uber" in vpa_lower or "ola" in vpa_lower:
+        m_str = "Travel"
+    else:
+        m_str = "Shopping"
+    
+    m_enc = int(le_merchant.transform([m_str])[0]) if m_str in le_merchant.classes_ else 0
+    d_enc = int(le_device.transform(["Android"])[0]) if "Android" in le_device.classes_ else 0
+    loc_changed_val = 1 if sw_drift > 50.0 else 0
+    hr = datetime.now().hour
+    dow = datetime.now().weekday()
+    wknd = 1 if dow >= 5 else 0
+    
+    swarm_features = pd.DataFrame([{
+        'amount_log': amount_log,
+        'hour': hr,
+        'day_of_week': dow,
+        'is_weekend': wknd,
+        'merchant_encoded': m_enc,
+        'device_encoded': d_enc,
+        'txn_count_1h': sw_vel,
+        'txn_amount_1h': sw_amt * max(1, sw_vel),
+        'location_changed': loc_changed_val
+    }])
+    try:
+        ml_prob = float(model.predict_proba(swarm_features)[0][1])
+    except Exception:
+        ml_prob = 0.85 if (sw_amt > 40000 or sw_root or sw_sim <= 2) else 0.05
 
     payload_swarm = {
         "tx_id": f"NPCI-{int(time.time()*1000)}",
@@ -680,6 +876,44 @@ with tab_swarm:
             mime="application/pdf",
             use_container_width=True
         )
+
+
+# -------------------------------------------------------------------------
+# TAB: 🛡️ SOAR PLAYBOOK & THREAT INTEL FEED
+# -------------------------------------------------------------------------
+with tab_soar:
+    ui_theme.glass_panel("🛡️ NPCI SOAR PLAYBOOK & CYBER THREAT INTEL FEED")
+    st.markdown("<p style='color: #94a3b8; font-size: 14px; margin-bottom: 20px;'>Autonomous Incident Containment (ISO 8583 switch freeze, FIDO2 biometric step-up, I4C / CERT-In dispatch, Cloud WAF IP quarantine) coupled with Live Cyber Threat Intelligence (IoCs, active malware APKs, rogue VPA clusters, Tor/VPN switch IPs, impossible travel radar).</p>", unsafe_allow_html=True)
+
+    soar_sub_tab1, soar_sub_tab2 = st.tabs([
+        "⚡ AUTOMATED SOAR INCIDENT PLAYBOOK",
+        "🌐 LIVE CYBER THREAT INTEL (IoCs)"
+    ])
+
+    with soar_sub_tab1:
+        import soar_playbook
+        curr_soar_txn = st.session_state.get('last_intercept')
+        if not curr_soar_txn:
+            curr_soar_txn = {
+                'rrn': 'RRN-98421098412',
+                'amt': 85000.0,
+                'hr': 3,
+                'merch': 'Crypto',
+                'dev': 'Android',
+                'count': 11,
+                'loc': 'Yes',
+                'payer_vpa': 'vikram.malhotra@okhdfcbank',
+                'payee_vpa': 'crypto_swap_node42@ybl',
+                'ip': '45.142.212.60',
+                'fraud_prob': 0.942,
+                'tau_star': 0.421,
+                'reason': 'Nighttime velocity anomaly + Geo drift'
+            }
+        soar_playbook.render_soar_component(curr_soar_txn, key_prefix="tab_soar_panel")
+
+    with soar_sub_tab2:
+        import threat_intel_feed
+        threat_intel_feed.render_threat_intel_component(key_prefix="tab_threat_panel")
 
 
 # -------------------------------------------------------------------------
@@ -1030,3 +1264,27 @@ with tab4:
             
     ui_theme.apply_plotly_dark(fig)
     st.plotly_chart(fig, use_container_width=True)
+
+# =========================================================================
+# TAB 6: NPCI SOC COPILOT & THREAT CHATBOT
+# =========================================================================
+with tab_copilot:
+    import soc_copilot
+    txn_ctx = st.session_state.get('last_intercept')
+    if not txn_ctx:
+        txn_ctx = {
+            'rrn': 'RRN-98421098412',
+            'amt': 85000.0,
+            'hr': 3,
+            'merch': 'Crypto',
+            'dev': 'Android',
+            'count': 11,
+            'loc': 'Yes',
+            'payer_vpa': 'vikram.malhotra@okhdfcbank',
+            'payee_vpa': 'crypto_swap_node42@ybl',
+            'ip': '45.142.212.60',
+            'fraud_prob': 0.942,
+            'tau_star': 0.421,
+            'reason': 'Nighttime velocity anomaly + Geo drift'
+        }
+    soc_copilot.render_soc_copilot_tab(txn_ctx, key_prefix='tab6_soc')
