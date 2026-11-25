@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import pandas as pd
 import numpy as np
 import joblib
@@ -36,7 +36,7 @@ PREDICTIONS_TOTAL = Counter("upi_predictions_total", "Total predictions by decis
 LATENCY_HISTOGRAM = Histogram("upi_inference_latency_seconds", "Inference latency in seconds", buckets=[0.005, 0.01, 0.02, 0.035, 0.05, 0.1])
 
 class Transaction(BaseModel):
-    amount: float
+    amount: float = Field(..., gt=0, le=1_000_000, description="Transaction amount in INR (must be > 0)")
     hour: int = 14
     merchant: str = "Grocery"
     device: str = "Android"

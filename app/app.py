@@ -1,4 +1,6 @@
 import streamlit as st
+import os
+_ANALYST_PIN = os.environ.get("ANALYST_PIN", "").strip()
 import pandas as pd
 import numpy as np
 import joblib
@@ -101,9 +103,10 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state.authenticated:
     ui_theme.glass_panel(" SOC Analyst Terminal Login")
-    pin = st.text_input("Enter Analyst Security PIN (Default: 1234)", type="password")
+    _warn = " ⚠️ Set ANALYST_PIN env variable before production use!" if not _ANALYST_PIN else ""
+    pin = st.text_input(f"Enter Analyst Security PIN{_warn}", type="password")
     if pin:
-        if pin == "1234":
+        if _ANALYST_PIN and pin == _ANALYST_PIN:
             st.session_state.authenticated = True
             st.rerun()
         else:
@@ -638,10 +641,10 @@ with tab1:
                 st.markdown("####  Step-Up Biometric Authentication")
                 st.caption("Enter Analyst Security PIN to override the automated quarantine.")
                 with st.form("qr_2fa_form"):
-                    pin_in = st.text_input("Analyst Override PIN (PIN: 1234):", type="password")
+                    pin_in = st.text_input("Analyst Override PIN:", type="password")
                     sub_override = st.form_submit_button("AUTHORIZE OVERRIDE")
                     if sub_override:
-                        if pin_in in ["1234", "123456"]:
+                        if _ANALYST_PIN and pin_in == _ANALYST_PIN:
                             st.success(" BIOMETRIC OVERRIDE VERIFIED. Transaction authorized under supervisor audit.")
                             st.balloons()
                         else:
@@ -1019,13 +1022,13 @@ with tab2:
         with st.form("stream_2fa_form"):
             col1, col2 = st.columns([1, 2])
             with col1:
-                pin = st.text_input("Enter Biometric PIN (Default: 1234):", type="password", max_chars=6)
+                pin = st.text_input("Enter Biometric PIN:", type="password", max_chars=6)
             with col2:
                 st.markdown("<br>", unsafe_allow_html=True)
                 submitted = st.form_submit_button("VERIFY & OVERRIDE ")
                 
             if submitted:
-                if pin in ["1234", "123456"]:
+                if _ANALYST_PIN and pin == _ANALYST_PIN:
                     st.success(" PIN VERIFIED. OVERRIDE GRANTED. Transaction released from quarantine.")
                     st.balloons()
                     del st.session_state['quarantine_txn']
