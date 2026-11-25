@@ -94,7 +94,7 @@ st.set_page_config(page_title="NPCI UPI Fraud SOC", page_icon="", layout="wide",
 ui_theme.inject_theme()
 
 ui_theme.render_ecosystem_header("upi")
-ui_theme.gradient_header(" NPCI UPI Real-Time Fraud Defense SOC", "TELEMETRY: LIVE | SWITCH LATENCY: 14.8ms (PASS <50ms SLA) | DPDP COMPLIANT")
+ui_theme.gradient_header(" NPCI UPI Real-Time Fraud Defense SOC", "TELEMETRY: LIVE | FASTAPI + PROMETHEUS OBSERVABILITY | DPDP COMPLIANT")
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -1181,31 +1181,50 @@ with tab3:
 # -------------------------------------------------------------------------
 with tab4:
     ui_theme.glass_panel(" MONEY MULE NETWORK GRAPH: MULTI-HOP LAYERING")
-    st.markdown("<p style='color: #94a3b8; padding-bottom: 20px;'>Visualizes complex syndicate networks (smurfing/money muling) routing ill-gotten funds across multiple VPA hops to offshore or crypto off-ramps.</p>", unsafe_allow_html=True)
-    
+    st.markdown("<p style='color: #94a3b8; padding-bottom: 20px;'>Computes NetworkX degree centrality and visualizes fan-in money-mule clusters from audited batches or SQLite fraud records.</p>", unsafe_allow_html=True)
+
     G = nx.DiGraph()
-    
+    main_db = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "processed", "upi_fraud.db"))
+
     if 'fraud_df' in st.session_state:
         df_net = st.session_state['fraud_df']
-        st.success(" Live Graph: Rendering network map from your audited settlement batch.")
-        
+        st.success("Live Graph: Rendering network topology from your audited settlement batch.")
+
         G.add_node("Primary Compromised VPA", color="#3b82f6", size=30)
-        
-        for idx, row in df_net.head(20).iterrows():
+
+        for idx, row in df_net.head(25).iterrows():
             merch = str(row['Merchant'])
             prob_str = str(row['Fraud_Probability']).replace('%', '')
             prob = float(prob_str) if prob_str else 0.0
-            
+
             node_color = "#ef4444" if prob > 50.0 else "#f59e0b" if prob > 30.0 else "#10b981"
             size = 25 if prob > 50.0 else 15
             node_name = f"{merch}\n(Hop {idx})"
             G.add_node(node_name, color=node_color, size=size)
             G.add_edge("Primary Compromised VPA", node_name)
-    else:
-        st.info("ℹ Displaying realistic money mule syndicate topology.")
+    elif os.path.exists(main_db):
+        try:
+            conn_net = sqlite3.connect(main_db)
+            mule_df = pd.read_sql_query(
+                "SELECT sender_upi, receiver_upi, amount FROM transactions WHERE is_fraud = 1 ORDER BY amount DESC LIMIT 35",
+                conn_net
+            )
+            conn_net.close()
+            if not mule_df.empty:
+                st.success(f"Database Graph: Loaded top {len(mule_df)} flagged fraud flows directly from upi_fraud.db.")
+                for _, r in mule_df.iterrows():
+                    G.add_edge(str(r['sender_upi']), str(r['receiver_upi']), weight=float(r['amount']))
+                in_deg = dict(G.in_degree())
+                for n in G.nodes():
+                    deg = in_deg.get(n, 0)
+                    G.nodes[n]['color'] = "#ef4444" if deg >= 2 else ("#f59e0b" if deg == 1 else "#3b82f6")
+                    G.nodes[n]['size'] = min(32, 14 + deg * 6)
+        except Exception:
+            G.clear()
+
+    if len(G.nodes()) == 0:
+        st.info("Displaying baseline multi-hop syndicate topology (upload a batch CSV or connect upi_fraud.db for live entity clustering).")
         G.add_node("Compromised Payer\n(rahul@oksbi)", color="#3b82f6", size=25)
-        
-        # Mules
         mules = [
             ("Mule Layer 1\n(fast_cash@ybl)", "#f59e0b", 18),
             ("Mule Layer 1\n(student_loan@paytm)", "#f59e0b", 18),
@@ -1214,7 +1233,6 @@ with tab4:
         ]
         for name, col, sz in mules:
             G.add_node(name, color=col, size=sz)
-            
         G.add_edge("Compromised Payer\n(rahul@oksbi)", "Mule Layer 1\n(fast_cash@ybl)")
         G.add_edge("Compromised Payer\n(rahul@oksbi)", "Mule Layer 1\n(student_loan@paytm)")
         G.add_edge("Mule Layer 1\n(fast_cash@ybl)", "Mule Layer 2\n(aggregator_node@okaxis)")

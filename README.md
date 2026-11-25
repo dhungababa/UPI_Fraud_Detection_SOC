@@ -1,23 +1,33 @@
-# UPI / Digital Payment Fraud Detector
+# UPI Fraud Detection & Defense SOC Engine
 
-## Problem
-UPI is now India's dominant retail payment rail processing billions of transactions. Fraud is a small fraction of that volume but a real and growing cost. This project aims to accurately detect fraud in real-time while minimizing false positives to avoid damaging genuine customers' trust.
+## Overview
+Real-time UPI payment fraud scoring microservice and Security Operations Center (SOC) dashboard combining imbalanced ML classification (**XGBoost + SMOTE**), cost-sensitive expected-loss thresholding ($\tau^*$), stateful velocity & impossible-travel enrichment, and **SHAP** local feature attribution.
 
-## Data
-Kaggle "UPI Transactions 2024 Dataset". Note: This is a synthetic dataset generated programmatically to mimic real UPI patterns while preserving privacy, as real banking transaction data is not publicly released for security reasons.
+## Data & Honest Scope
+- **Dataset:** 500,000 synthetic DPDP-compliant UPI transactions (`1.00%` fraud / `99:1` imbalance generated via `src/generate_data.py` with overlapping feature distributions). Real banking switch transaction logs are not publicly available for privacy reasons.
+- **Measured Chronological Test Metrics (80/20 time split, default 0.50 cutoff):**
+  - Fraud Recall: **76.43%**
+  - Precision: **23.79%**
+  - F1-Score: **0.3628**
+  - In production mode, dynamic cost-sensitive thresholding ($\tau^* = C_{FP} / (C_{FP} + C_{FN})$) adjusts the decision boundary based on transaction rupee exposure vs. customer friction cost (`INR 50`).
 
-## Approach
-- EDA & Feature Engineering: Calculated rolling 1-hour transaction velocities and geolocation anomalies using Pandas.
-- Machine Learning: Trained an XGBoost Classifier handling the 99:1 extreme imbalance using SMOTE (Synthetic Minority Oversampling Technique).
-- Explainable AI: Implemented SHAP (Shapley Additive exPlanations) to generate human-readable reason codes for regulatory compliance.
-- Deployment: Built an interactive frontend using Streamlit.
+## Architecture
+1. **Inference API (`api/main.py` — FastAPI):**
+   - `POST /predict`: Stateful feature enrichment (`StatefulFeatureStore`), Haversine velocity anomaly detection (`src/geo_resolver.py`), XGBoost fraud scoring, and SHAP `TreeExplainer` reason codes.
+   - `WS /ws/traffic`: AsyncIO WebSocket real-time streaming route.
+   - `GET /metrics` & `GET /health`: Prometheus telemetry counters and inference latency histograms.
+2. **Feature Engineering & Explainability (`src/`):**
+   - Rolling 10-minute / 1-hour payer velocity windows, spherical Haversine geo-drift (`>800 km/h` impossible travel trigger), SMOTE training pipeline, and SHAP summary/waterfall plots.
+3. **Interactive Dashboard & Sandbox Playbooks (`app/`):**
+   - Multi-tab Streamlit SOC interface with dynamic UPI QR simulation, NetworkX fraud-ring graph analysis on SQLite records, and **sandbox-simulated** SOAR response payloads (ISO 8583 MTI 0420 freeze schema, FIDO2 challenge, I4C NCRP dossier).
 
-## Results
-- The model successfully balances Recall and Precision for highly imbalanced data.
-- Explanations are provided natively alongside predictions.
-
-## Explainability
-Example: *Flagged because of unusual: txn_count_1h, amount_log, hour*
+## Running & Testing
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+uvicorn api.main:app --host 127.0.0.1 --port 9001
+streamlit run app/app.py
+```
 
 ## Tech Stack
-`pandas`, `scikit-learn`, `xgboost`, `imbalanced-learn` (SMOTE), `shap`, `streamlit`
+`Python`, `FastAPI`, `XGBoost`, `scikit-learn`, `imbalanced-learn`, `SHAP`, `LIME`, `Pandas`, `NumPy`, `NetworkX`, `SQLite`, `Prometheus`, `Docker`, `Streamlit`, `Pytest`

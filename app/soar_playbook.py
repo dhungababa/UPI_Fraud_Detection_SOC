@@ -55,12 +55,8 @@ def execute_soar_playbook(rrn: str, action_type: str, txn_data: dict) -> dict:
 
     action_key = str(action_type).lower().strip()
 
-    # 1. SWITCH FREEZE: ISO 8583 NPCI SWITCH COMMAND
+    # 1. SWITCH FREEZE: ISO 8583 NPCI SWITCH COMMAND (Sandbox Simulation)
     if action_key == "switch_freeze":
-        # Simulate sub-50ms switch roundtrip
-        simulated_ms = round(random.uniform(14.2, 26.8), 2)
-        exec_latency = max(simulated_ms, (time.perf_counter() - t_start) * 1000.0)
-        
         iso_packet = {
             "MTI": "0420",  # Acquirer Reversal / Payee Account Freeze Advice
             "DE-002 (PAN / Virtual Account)": f"VPA:{payee_vpa}",
@@ -73,29 +69,28 @@ def execute_soar_playbook(rrn: str, action_type: str, txn_data: dict) -> dict:
             "DE-048 (Private Data / Fraud Directive)": "NPCI-DPDP-SEC-2026: Rogue Payee VPA Quarantined",
             "DE-102 (Payer VPA)": payer_vpa,
             "DE-103 (Beneficiary Payee VPA)": payee_vpa,
-            "Target Node": "NPCI-UPI-CORE-SWITCH-DC01.npci.org.in:9850"
+            "Target Node": "SANDBOX-SWITCH-SIMULATOR (ISO 8583 Mock)"
         }
+        exec_latency = round((time.perf_counter() - t_start) * 1000.0, 3)
 
         return {
             "action_id": f"SOAR-FRZ-{clean_rrn[-6:]}-{random.randint(100, 999)}",
             "action_type": "switch_freeze",
-            "action_title": "NPCI Switch ISO 8583 VPA Account Freeze",
+            "action_title": "Simulated ISO 8583 VPA Account Freeze Payload",
             "status": "EXECUTED_SUCCESS",
+            "simulation_mode": True,
             "rrn": clean_rrn,
             "target": payee_vpa,
             "latency_ms": exec_latency,
-            "sla_status": "PASS (<50ms SLA)",
+            "sla_status": "PASS (<50ms SLA)" if exec_latency < 50.0 else "WARN (>50ms)",
             "timestamp": now_ist,
-            "summary": f"Dispatched ISO 8583 MTI 0420 reversal to NPCI switch. Inbound credits for '{payee_vpa}' are frozen instantly.",
-            "protocol": "ISO 8583:1993 (NPCI UPI Specification v2.8) over TLS 1.3 mTLS",
+            "summary": f"Constructed ISO 8583 MTI 0420 freeze payload in sandbox mode for '{payee_vpa}' in {exec_latency:.2f}ms.",
+            "protocol": "ISO 8583:1993 Payload Schema (Sandbox Simulation)",
             "telemetry_packet": iso_packet
         }
 
     # 2. BIOMETRIC STEP-UP CHALLENGE (FIDO2 / SIM BINDING)
     elif action_key == "biometric_step_up":
-        simulated_ms = round(random.uniform(18.5, 34.2), 2)
-        exec_latency = max(simulated_ms, (time.perf_counter() - t_start) * 1000.0)
-        
         challenge_nonce = hashlib.sha256(f"{clean_rrn}:{now_iso}:{payer_vpa}".encode()).hexdigest()[:32]
         fido2_packet = {
             "auth_channel": "APNs / FCM Priority Push + FIDO2 / WebAuthn Biometric Prompt",
@@ -105,35 +100,34 @@ def execute_soar_playbook(rrn: str, action_type: str, txn_data: dict) -> dict:
             "challenge_nonce": challenge_nonce,
             "sim_binding_status": "RE-VERIFICATION_REQUIRED (IMSI / eUICC Hash Match)",
             "biometric_modality": "Handset Secure Enclave (FaceID / Fingerprint / Aadhaar Iris L1)",
-            "callback_webhook": f"https://api.npci.org.in/v2/upi/auth-callback/{clean_rrn}",
+            "callback_webhook": f"https://sandbox.local/v2/upi/auth-callback/{clean_rrn}",
             "timeout_seconds": 60,
             "step_up_reason": f"High risk anomaly detected (Risk: {fraud_prob*100:.1f}%, Reason: {reason})"
         }
+        exec_latency = round((time.perf_counter() - t_start) * 1000.0, 3)
 
         return {
             "action_id": f"SOAR-BIO-{clean_rrn[-6:]}-{random.randint(100, 999)}",
             "action_type": "biometric_step_up",
-            "action_title": "Out-of-Band Biometric & SIM-Binding Re-Verification",
+            "action_title": "Simulated FIDO2 Biometric & SIM-Binding Challenge",
             "status": "DISPATCHED_PENDING_USER",
+            "simulation_mode": True,
             "rrn": clean_rrn,
             "target": payer_vpa,
             "latency_ms": exec_latency,
-            "sla_status": "PASS (<50ms SLA)",
+            "sla_status": "PASS (<50ms SLA)" if exec_latency < 50.0 else "WARN (>50ms)",
             "timestamp": now_ist,
-            "summary": f"Pushed out-of-band FIDO2 cryptographic biometric challenge to {payer_vpa}'s registered secure enclave.",
-            "protocol": "FIDO2 / WebAuthn L2 Authenticator + FCM High-Priority Push",
+            "summary": f"Generated FIDO2 challenge payload for {payer_vpa} in {exec_latency:.2f}ms.",
+            "protocol": "FIDO2 / WebAuthn Payload Schema (Sandbox Simulation)",
             "telemetry_packet": fido2_packet
         }
 
     # 3. CERT-IN / I4C NCRP INCIDENT DISPATCH
     elif action_key == "cert_in_dispatch":
-        simulated_ms = round(random.uniform(22.1, 41.5), 2)
-        exec_latency = max(simulated_ms, (time.perf_counter() - t_start) * 1000.0)
-        
         incident_ref = f"NCRP/2026/UPI/{random.randint(1000000, 9999999)}"
         device_hash = hashlib.sha256(f"{device_id}:{client_ip}".encode()).hexdigest()[:24]
         ncrp_packet = {
-            "portal": "Indian Cyber Crime Coordination Centre (I4C) / NCRP 1930 Helpline API",
+            "portal": "I4C / NCRP Incident Dossier Schema (Sandbox)",
             "incident_ticket_ref": incident_ref,
             "category": "Cyber Financial Fraud — Unauthorized Electronic Payment (UPI)",
             "rrn": clean_rrn,
@@ -145,54 +139,55 @@ def execute_soar_playbook(rrn: str, action_type: str, txn_data: dict) -> dict:
             "originating_device_fingerprint": device_hash,
             "fraud_probability": round(fraud_prob, 4),
             "primary_ml_indicator": reason,
-            "recommended_enforcement": "Immediate Freeze of Destination Account under Section 91 CrPC / DPDP Act 2023",
-            "cert_in_coordination_status": "DISPATCHED (CERT-In Financial SOC Desk Copy Forwarded)"
+            "recommended_enforcement": "Review Destination Account under Section 91 CrPC / DPDP Act 2023",
+            "cert_in_coordination_status": "GENERATED_SANDBOX_DOSSIER"
         }
+        exec_latency = round((time.perf_counter() - t_start) * 1000.0, 3)
 
         return {
             "action_id": f"SOAR-NCRP-{clean_rrn[-6:]}-{random.randint(100, 999)}",
             "action_type": "cert_in_dispatch",
-            "action_title": "I4C / NCRP & CERT-In Incident Dossier Dispatch",
+            "action_title": "Simulated I4C / NCRP Incident Dossier Generator",
             "status": "DISPATCHED_CONFIRMED",
+            "simulation_mode": True,
             "rrn": clean_rrn,
-            "target": f"I4C NCRP Portal ({incident_ref})",
+            "target": f"I4C NCRP Schema ({incident_ref})",
             "latency_ms": exec_latency,
-            "sla_status": "PASS (<50ms SLA)",
+            "sla_status": "PASS (<50ms SLA)" if exec_latency < 50.0 else "WARN (>50ms)",
             "timestamp": now_ist,
-            "summary": f"Formulated and electronically dispatched official I4C/NCRP cyber incident packet for RRN {clean_rrn}.",
-            "protocol": "Govt of India I4C Inter-Bank Fraud Management REST API v2.4 (HMAC-SHA256)",
+            "summary": f"Generated I4C/NCRP structured incident dossier for RRN {clean_rrn} in {exec_latency:.2f}ms.",
+            "protocol": "I4C Inter-Bank Incident Schema (Sandbox Simulation)",
             "telemetry_packet": ncrp_packet
         }
 
     # 4. CLOUD WAF FIREWALL QUARANTINE
     elif action_key == "firewall_quarantine":
-        simulated_ms = round(random.uniform(11.4, 21.9), 2)
-        exec_latency = max(simulated_ms, (time.perf_counter() - t_start) * 1000.0)
-        
         waf_rule_id = f"waf-rule-drop-{hashlib.md5(client_ip.encode()).hexdigest()[:8]}"
         waf_packet = {
-            "waf_provider": "NPCI Edge Security Shield (Cloudflare Magic Transit / AWS WAF)",
+            "waf_provider": "Edge WAF Policy Generator (Sandbox)",
             "target_ip_cidr": f"{client_ip}/32",
             "action": "DROP_IMMEDIATE (TCP RST / HTTP 403 Forbidden)",
             "applied_rule_id": waf_rule_id,
-            "edge_scope": "All NPCI UPI Ingress Gateways & Switch Edge PoPs",
+            "edge_scope": "Ingress Gateway Policy Rule (Simulated)",
             "ttl_quarantine_hours": 72,
             "trigger_rrn": clean_rrn,
             "reason": f"Malicious UPI transaction spoofing / Automated botnet activity ({reason})"
         }
+        exec_latency = round((time.perf_counter() - t_start) * 1000.0, 3)
 
         return {
             "action_id": f"SOAR-WAF-{clean_rrn[-6:]}-{random.randint(100, 999)}",
             "action_type": "firewall_quarantine",
-            "action_title": "Cloud Edge WAF Client IP Quarantine",
+            "action_title": "Simulated Cloud Edge WAF IP Rule Generator",
             "status": "APPLIED_EDGE_ACTIVE",
+            "simulation_mode": True,
             "rrn": clean_rrn,
             "target": f"{client_ip}/32",
             "latency_ms": exec_latency,
-            "sla_status": "PASS (<50ms SLA)",
+            "sla_status": "PASS (<50ms SLA)" if exec_latency < 50.0 else "WARN (>50ms)",
             "timestamp": now_ist,
-            "summary": f"Blacklisted client IP {client_ip} across all NPCI cloud ingress edge nodes for 72 hours.",
-            "protocol": "Cloud Edge WAF Policy Sync via gRPC / BGP Flowspec Filter",
+            "summary": f"Generated WAF quarantine rule for {client_ip}/32 in {exec_latency:.2f}ms.",
+            "protocol": "Cloud Edge WAF Policy Schema (Sandbox Simulation)",
             "telemetry_packet": waf_packet
         }
 

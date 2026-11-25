@@ -5,12 +5,16 @@ scikit-learn==1.5.1
 xgboost==2.1.0
 imbalanced-learn==0.12.3
 shap==0.46.0
+lime
 plotly==5.24.0
 joblib==1.4.2
 google-generativeai==0.8.4
+ollama
 fastapi
 uvicorn
 pydantic
+prometheus-client
+sqlalchemy
 requests
 matplotlib
 networkx

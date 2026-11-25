@@ -185,8 +185,9 @@ async def websocket_traffic_stream(websocket: WebSocket):
             d_enc = int(le_device.transform([dev])[0]) if dev in le_device.classes_ else 0
             loc_val = 1 if (enrichment['geo_drift_km'] > 25.0 or enrichment['is_impossible_travel']) else 0
             
-            cur_dow = int(time.strftime('%w'))
-            cur_is_wknd = 1 if cur_dow in [0, 6] else 0
+            import datetime
+            cur_dow = datetime.datetime.now().weekday()
+            cur_is_wknd = 1 if cur_dow >= 5 else 0
             
             feats = pd.DataFrame([{
                 'amount_log': amount_log, 'hour': hr, 'day_of_week': cur_dow, 'is_weekend': cur_is_wknd,
