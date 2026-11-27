@@ -548,6 +548,18 @@ with tab1:
                     mime="application/pdf",
                     use_container_width=True
                 )
+            with col_2fa:
+                st.markdown("####  Step-Up Biometric Authentication")
+                st.caption("Enter Analyst Security PIN to override the automated quarantine.")
+                with st.form("qr_2fa_form"):
+                    pin_in = st.text_input("Analyst Override PIN:", type="password")
+                    sub_override = st.form_submit_button("AUTHORIZE OVERRIDE")
+                    if sub_override:
+                        if _ANALYST_PIN and pin_in == _ANALYST_PIN:
+                            st.success(" BIOMETRIC OVERRIDE VERIFIED. Transaction authorized under supervisor audit.")
+                            st.balloons()
+                        else:
+                            st.error(" INVALID PIN. Account frozen under DPDP protocol.")
 
 
         # ==========================================
@@ -637,18 +649,6 @@ with tab1:
 
         except Exception as e_globe:
             st.caption(f"3D Globe Engine: {e_globe}")
-            with col_2fa:
-                st.markdown("####  Step-Up Biometric Authentication")
-                st.caption("Enter Analyst Security PIN to override the automated quarantine.")
-                with st.form("qr_2fa_form"):
-                    pin_in = st.text_input("Analyst Override PIN:", type="password")
-                    sub_override = st.form_submit_button("AUTHORIZE OVERRIDE")
-                    if sub_override:
-                        if _ANALYST_PIN and pin_in == _ANALYST_PIN:
-                            st.success(" BIOMETRIC OVERRIDE VERIFIED. Transaction authorized under supervisor audit.")
-                            st.balloons()
-                        else:
-                            st.error(" INVALID PIN. Account frozen under DPDP protocol.")
 
 
     # ==========================================
